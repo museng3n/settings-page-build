@@ -7,6 +7,8 @@ import { Cairo } from "next/font/google"
 
 // @ts-ignore - Import من JavaScript files
 import { authAPI, settingsAPI, teamAPI, billingAPI, integrationsAPI, securityAPI, advancedAPI } from "../../shared-api-config/api/endpoints"
+// @ts-ignore
+import { logout } from "../../shared-api-config/utils/auth"
 
 const cairo = Cairo({ subsets: ["arabic"], weight: ["400", "600", "700"] })
 
@@ -92,7 +94,7 @@ export default function SettingsPage() {
   return (
     <div className={`min-h-screen bg-gray-50 ${cairo.className}`} dir="rtl">
       {/* Fixed Sidebar - Right side for RTL */}
-      <div className="w-64 h-screen bg-white border-l border-gray-200 fixed right-0 top-0 overflow-y-auto">
+      <div className="w-64 h-screen bg-white border-l border-gray-200 fixed right-0 top-0 overflow-y-auto flex flex-col">
         {/* Header */}
         <div className="p-6 border-b border-gray-200">
           <h1 className="text-2xl font-bold text-gray-900">الإعدادات</h1>
@@ -272,6 +274,24 @@ export default function SettingsPage() {
             />
           )}
         </nav>
+
+        {/* Logout Button - pushed to bottom */}
+        <div className="mt-auto border-t border-gray-200 p-4">
+          <button
+            onClick={() => { authAPI.logout().catch(() => {}); logout(); }}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-right text-red-600 hover:bg-red-50"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+              />
+            </svg>
+            <span className="text-sm font-medium">تسجيل الخروج</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Content - margin-right to avoid sidebar overlap */}
