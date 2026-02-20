@@ -1,5 +1,20 @@
-import { redirect } from "next/navigation"
+"use client"
+
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 
 export default function Home() {
-  redirect("/settings")
+  const router = useRouter()
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const urlToken = urlParams.get('token')
+    if (urlToken) {
+      localStorage.setItem('authToken', urlToken)
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+    router.replace("/settings")
+  }, [router])
+
+  return null
 }
