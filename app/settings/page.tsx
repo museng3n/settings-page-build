@@ -1465,10 +1465,142 @@ const PLATFORMS = [
   },
 ]
 
+// تعريف حقول الإعدادات لكل منصة
+interface SettingsField {
+  key: string
+  labelAr: string
+  labelEn: string
+  type: "password" | "text" | "readonly"
+  placeholder?: string
+}
+
+const PLATFORM_FIELDS: Record<string, SettingsField[]> = {
+  instagram: [
+    { key: "accessToken", labelAr: "رمز الوصول", labelEn: "Access Token", type: "password", placeholder: "EAAxxxxxxx..." },
+    { key: "businessAccountId", labelAr: "معرّف حساب الأعمال", labelEn: "Instagram Business Account ID", type: "text", placeholder: "17841400XXXXXX" },
+    { key: "webhookVerifyToken", labelAr: "رمز تحقق الويب هوك", labelEn: "Webhook Verify Token", type: "readonly" },
+  ],
+  facebook: [
+    { key: "accessToken", labelAr: "رمز الوصول", labelEn: "Access Token", type: "password", placeholder: "EAAxxxxxxx..." },
+    { key: "pageId", labelAr: "معرّف الصفحة", labelEn: "Page ID", type: "text", placeholder: "100XXXXXXXXXX" },
+    { key: "webhookVerifyToken", labelAr: "رمز تحقق الويب هوك", labelEn: "Webhook Verify Token", type: "readonly" },
+  ],
+  brevo: [
+    { key: "apiKey", labelAr: "مفتاح API", labelEn: "API Key", type: "password", placeholder: "xkeysib-xxxxxxx..." },
+    { key: "senderName", labelAr: "اسم المرسل", labelEn: "Sender Name", type: "text", placeholder: "Triggerio" },
+    { key: "senderEmail", labelAr: "إيميل المرسل", labelEn: "Sender Email", type: "text", placeholder: "hello@triggerio.io" },
+  ],
+  gohighlevel: [
+    { key: "apiKey", labelAr: "مفتاح API", labelEn: "API Key", type: "password", placeholder: "eyJhbGciOiJSUzI1NiI..." },
+    { key: "locationId", labelAr: "معرّف الموقع", labelEn: "Location ID", type: "text", placeholder: "xxxxxxxxxxxxxxxx" },
+  ],
+}
+
+// توليد رمز تحقق عشوائي
+function generateVerifyToken(): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+  let result = "trig_verify_"
+  for (let i = 0; i < 24; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+  return result
+}
+
+// مكوّن حقل كلمة المرور مع زر إظهار/إخفاء + نسخ
+function SecureField({ value, onChange, placeholder, readOnly = false }: { value: string; onChange?: (val: string) => void; placeholder?: string; readOnly?: boolean }) {
+  const [visible, setVisible] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    if (!value) return
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // fallback
+      const ta = document.createElement("textarea")
+      ta.value = value
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand("copy")
+      document.body.removeChild(ta)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  return (
+    <div className="relative flex items-center">
+      <input
+        type={visible ? "text" : "password"}
+        value={value}
+        onChange={(e) => onChange?.(e.target.value)}
+        readOnly={readOnly}
+        placeholder={placeholder}
+        className={`w-full h-10 px-3 pr-20 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7C3AED]/20 focus:border-[#7C3AED] outline-none transition-colors font-mono ${readOnly ? "bg-gray-50 text-gray-500 cursor-default" : "bg-white text-gray-900"}`}
+        dir="ltr"
+      />
+      <div className="absolute left-2 flex items-center gap-1" dir="ltr">
+        {/* زر نسخ */}
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="p-1.5 text-gray-400 hover:text-[#7C3AED] rounded-md hover:bg-[#7C3AED]/5 transition-colors"
+          title="نسخ"
+        >
+          {copied ? (
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#10B981]"><path d="M20 6 9 17l-5-5"/></svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+          )}
+        </button>
+        {/* زر إظهار/إخفاء */}
+        <button
+          type="button"
+          onClick={() => setVisible(!visible)}
+          className="p-1.5 text-gray-400 hover:text-[#7C3AED] rounded-md hover:bg-[#7C3AED]/5 transition-colors"
+          title={visible ? "إخفاء" : "إظهار"}
+        >
+          {visible ? (
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" x2="23" y1="1" y2="23"/></svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          )}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// مكوّن حقل نصي عادي مع نسخ
+function TextField({ value, onChange, placeholder }: { value: string; onChange: (val: string) => void; placeholder?: string }) {
+  return (
+    <input
+      type="text"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="w-full h-10 px-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7C3AED]/20 focus:border-[#7C3AED] outline-none transition-colors bg-white text-gray-900 font-mono"
+      dir="ltr"
+    />
+  )
+}
+
 function IntegrationsSection() {
   const [apiIntegrations, setApiIntegrations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [settingsModal, setSettingsModal] = useState<{ open: boolean; integration: any; settings: any; loading: boolean }>({ open: false, integration: null, settings: null, loading: false })
+  const [settingsModal, setSettingsModal] = useState<{
+    open: boolean
+    integration: any
+    settings: any
+    loading: boolean
+  }>({ open: false, integration: null, settings: null, loading: false })
+  const [formData, setFormData] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [hasChanges, setHasChanges] = useState(false)
 
   useEffect(() => {
     const fetchIntegrations = async () => {
@@ -1504,7 +1636,6 @@ function IntegrationsSection() {
     try {
       console.log("🔵 Settings: Connecting integration:", platformId)
       await integrationsAPI.connect(platformId, {})
-      // Refresh integrations list
       const response = await integrationsAPI.getAll()
       const data = response.integrations || response.data || response || []
       setApiIntegrations(Array.isArray(data) ? data : [])
@@ -1529,16 +1660,82 @@ function IntegrationsSection() {
 
   const handleOpenSettings = async (platform: any) => {
     setSettingsModal({ open: true, integration: platform, settings: null, loading: true })
+    setSaveSuccess(false)
+    setSaveError(null)
+    setHasChanges(false)
     try {
       console.log("🔵 Settings: Fetching settings for:", platform.id)
       const response = await integrationsAPI.getSettings(platform.id)
       console.log("🟢 Settings: Got settings:", response)
-      setSettingsModal(prev => ({ ...prev, settings: response.settings || response.data || response, loading: false }))
+      const settings = response.settings || response.data || response || {}
+      setSettingsModal(prev => ({ ...prev, settings, loading: false }))
+
+      // تعبئة البيانات من الـ API مع توليد webhook token إذا لم يوجد
+      const fields = PLATFORM_FIELDS[platform.id] || []
+      const initial: Record<string, string> = {}
+      fields.forEach((field) => {
+        if (field.type === "readonly" && field.key === "webhookVerifyToken") {
+          initial[field.key] = settings[field.key] || generateVerifyToken()
+        } else {
+          initial[field.key] = settings[field.key] || ""
+        }
+      })
+      setFormData(initial)
     } catch (err: any) {
       console.error("❌ Settings: Failed to fetch settings:", err)
+      // حتى لو فشل الجلب، نعرض الحقول فارغة
+      const fields = PLATFORM_FIELDS[platform.id] || []
+      const initial: Record<string, string> = {}
+      fields.forEach((field) => {
+        if (field.type === "readonly" && field.key === "webhookVerifyToken") {
+          initial[field.key] = generateVerifyToken()
+        } else {
+          initial[field.key] = ""
+        }
+      })
+      setFormData(initial)
       setSettingsModal(prev => ({ ...prev, settings: {}, loading: false }))
     }
   }
+
+  const handleCloseModal = () => {
+    if (hasChanges) {
+      if (!confirm("لديك تغييرات غير محفوظة. هل تريد الإغلاق بدون حفظ؟")) return
+    }
+    setSettingsModal({ open: false, integration: null, settings: null, loading: false })
+    setFormData({})
+    setSaveSuccess(false)
+    setSaveError(null)
+    setHasChanges(false)
+  }
+
+  const handleFieldChange = (key: string, value: string) => {
+    setFormData(prev => ({ ...prev, [key]: value }))
+    setHasChanges(true)
+    setSaveSuccess(false)
+    setSaveError(null)
+  }
+
+  const handleSaveSettings = async () => {
+    if (!settingsModal.integration) return
+    setSaving(true)
+    setSaveSuccess(false)
+    setSaveError(null)
+    try {
+      console.log("🔵 Settings: Saving settings for:", settingsModal.integration.id, formData)
+      await integrationsAPI.updateSettings(settingsModal.integration.id, formData)
+      setSaveSuccess(true)
+      setHasChanges(false)
+      setTimeout(() => setSaveSuccess(false), 3000)
+    } catch (err: any) {
+      console.error("❌ Settings: Failed to save:", err)
+      setSaveError(err.message || "فشل حفظ الإعدادات")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const currentFields = settingsModal.integration ? (PLATFORM_FIELDS[settingsModal.integration.id] || []) : []
 
   return (
     <div className="p-8">
@@ -1627,71 +1824,143 @@ function IntegrationsSection() {
         </div>
       )}
 
-      {/* Settings Modal */}
+      {/* Settings Modal - مودال الإعدادات المفصّل */}
       {settingsModal.open && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setSettingsModal({ open: false, integration: null, settings: null, loading: false })}>
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-6">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50" onClick={handleCloseModal}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 bg-gray-50/50">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 ${settingsModal.integration?.iconBg || "bg-gray-100"} rounded-lg flex items-center justify-center`}>
-                  <span className="text-xl">{settingsModal.integration?.icon}</span>
+                <div className={`w-11 h-11 ${settingsModal.integration?.iconBg || "bg-gray-100"} rounded-xl flex items-center justify-center shadow-sm`}>
+                  <span className="text-2xl">{settingsModal.integration?.icon}</span>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900">إعدادات {settingsModal.integration?.name}</h3>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">إعدادات {settingsModal.integration?.name}</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {settingsModal.integration?.connected && (
+                      <span className="inline-flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 bg-[#10B981] rounded-full"></span>
+                        متصل
+                        {settingsModal.integration?.lastSync && (
+                          <span className="text-gray-400 mr-1">- آخر مزامنة: {settingsModal.integration.lastSync}</span>
+                        )}
+                      </span>
+                    )}
+                  </p>
+                </div>
               </div>
-              <button onClick={() => setSettingsModal({ open: false, integration: null, settings: null, loading: false })} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+              <button
+                onClick={handleCloseModal}
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+              </button>
             </div>
 
-            {settingsModal.loading ? (
-              <div className="animate-pulse space-y-3">
-                <div className="h-10 bg-gray-200 rounded"></div>
-                <div className="h-10 bg-gray-200 rounded"></div>
-                <div className="h-10 bg-gray-200 rounded"></div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">الحالة</label>
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-[#10B981] rounded-full"></span>
-                    <span className="text-sm text-gray-600">متصل ويعمل بشكل طبيعي</span>
-                  </div>
+            {/* Modal Body */}
+            <div className="px-6 py-5 max-h-[60vh] overflow-y-auto">
+              {settingsModal.loading ? (
+                <div className="animate-pulse space-y-5">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="space-y-2">
+                      <div className="h-4 bg-gray-200 rounded w-28"></div>
+                      <div className="h-10 bg-gray-200 rounded-lg"></div>
+                    </div>
+                  ))}
                 </div>
-                {settingsModal.integration?.accountName && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">الحساب المتصل</label>
-                    <p className="text-sm text-gray-600">{settingsModal.integration.accountName}</p>
-                  </div>
-                )}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">آخر مزامنة</label>
-                  <p className="text-sm text-gray-600">{settingsModal.integration?.lastSync || "غير متوفر"}</p>
+              ) : (
+                <div className="space-y-5">
+                  {/* حقول الإعدادات الخاصة بكل منصة */}
+                  {currentFields.map((field) => (
+                    <div key={field.key}>
+                      <label className="block mb-1.5">
+                        <span className="text-sm font-semibold text-gray-800">{field.labelAr}</span>
+                        <span className="text-xs text-gray-400 mr-2 font-mono">{field.labelEn}</span>
+                        {field.type === "readonly" && (
+                          <span className="inline-block text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded mr-1 font-medium">تلقائي</span>
+                        )}
+                      </label>
+                      {field.type === "password" ? (
+                        <SecureField
+                          value={formData[field.key] || ""}
+                          onChange={(val) => handleFieldChange(field.key, val)}
+                          placeholder={field.placeholder}
+                        />
+                      ) : field.type === "readonly" ? (
+                        <SecureField
+                          value={formData[field.key] || ""}
+                          readOnly
+                        />
+                      ) : (
+                        <TextField
+                          value={formData[field.key] || ""}
+                          onChange={(val) => handleFieldChange(field.key, val)}
+                          placeholder={field.placeholder}
+                        />
+                      )}
+                    </div>
+                  ))}
+
+                  {/* رسائل النجاح/الخطأ */}
+                  {saveSuccess && (
+                    <div className="flex items-center gap-2 px-3 py-2.5 bg-[#10B981]/10 border border-[#10B981]/20 rounded-lg">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                      <span className="text-sm font-medium text-[#10B981]">تم حفظ الإعدادات بنجاح</span>
+                    </div>
+                  )}
+                  {saveError && (
+                    <div className="flex items-center gap-2 px-3 py-2.5 bg-red-50 border border-red-200 rounded-lg">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" x2="9" y1="9" y2="15"/><line x1="9" x2="15" y1="9" y2="15"/></svg>
+                      <span className="text-sm font-medium text-red-600">{saveError}</span>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">المزامنة التلقائية</label>
-                  <p className="text-sm text-gray-600">مفعّلة - كل 15 دقيقة</p>
-                </div>
-                <div className="pt-4 border-t border-gray-200 flex gap-2">
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            {!settingsModal.loading && (
+              <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/30 flex items-center justify-between gap-3">
+                <button
+                  onClick={async () => {
+                    if (confirm(`هل تريد فصل ${settingsModal.integration?.name}؟ سيتم حذف جميع الإعدادات.`)) {
+                      try {
+                        await integrationsAPI.disconnect(settingsModal.integration?.id)
+                        setApiIntegrations(prev => prev.filter((i: any) => i.id !== settingsModal.integration?.id))
+                        setSettingsModal({ open: false, integration: null, settings: null, loading: false })
+                        setFormData({})
+                        setHasChanges(false)
+                      } catch (err: any) {
+                        alert(err.message || "فشل فصل التكامل")
+                      }
+                    }
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                >
+                  فصل التكامل
+                </button>
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setSettingsModal({ open: false, integration: null, settings: null, loading: false })}
-                    className="flex-1 px-4 py-2 bg-[#7C3AED] text-white rounded-lg hover:bg-[#6D28D9] text-sm font-medium"
+                    onClick={handleCloseModal}
+                    className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
                   >
-                    إغلاق
+                    إلغاء
                   </button>
                   <button
-                    onClick={async () => {
-                      if (confirm(`هل تريد فصل ${settingsModal.integration?.name}؟`)) {
-                        try {
-                          await integrationsAPI.disconnect(settingsModal.integration?.id)
-                          setApiIntegrations(prev => prev.filter((i: any) => i.id !== settingsModal.integration?.id))
-                          setSettingsModal({ open: false, integration: null, settings: null, loading: false })
-                        } catch (err: any) {
-                          alert(err.message || "فشل فصل التكامل")
-                        }
-                      }
-                    }}
-                    className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 text-sm font-medium"
+                    onClick={handleSaveSettings}
+                    disabled={saving || !hasChanges}
+                    className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all ${
+                      saving || !hasChanges
+                        ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                        : "bg-[#7C3AED] text-white hover:bg-[#6D28D9] shadow-sm hover:shadow"
+                    }`}
                   >
-                    فصل التكامل
+                    {saving ? (
+                      <span className="flex items-center gap-2">
+                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                        جاري الحفظ...
+                      </span>
+                    ) : "حفظ الإعدادات"}
                   </button>
                 </div>
               </div>
