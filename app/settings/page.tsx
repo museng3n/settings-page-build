@@ -1434,8 +1434,39 @@ function AutomationSection() {
 }
 
 // SECTION 6: Integrations
+const PLATFORMS = [
+  {
+    id: "instagram",
+    name: "Instagram",
+    icon: "📷",
+    iconBg: "bg-gradient-to-br from-[#E4405F] via-[#F77737] to-[#FCAF45]",
+    description: "أتمتة التعليقات والرسائل على Instagram",
+  },
+  {
+    id: "facebook",
+    name: "Facebook",
+    icon: "📘",
+    iconBg: "bg-[#1877F2]",
+    description: "أتمتة المنشورات والتعليقات على Facebook",
+  },
+  {
+    id: "brevo",
+    name: "Brevo",
+    icon: "📧",
+    iconBg: "bg-[#3B82F6]",
+    description: "إرسال حملات البريد الإلكتروني",
+  },
+  {
+    id: "gohighlevel",
+    name: "GoHighLevel",
+    icon: "⚡",
+    iconBg: "bg-[#10B981]",
+    description: "مزامنة جهات الاتصال وإدارة CRM",
+  },
+]
+
 function IntegrationsSection() {
-  const [integrations, setIntegrations] = useState<any[]>([])
+  const [apiIntegrations, setApiIntegrations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [settingsModal, setSettingsModal] = useState<{ open: boolean; integration: any; settings: any; loading: boolean }>({ open: false, integration: null, settings: null, loading: false })
 
@@ -1447,7 +1478,7 @@ function IntegrationsSection() {
         const response = await integrationsAPI.getAll()
         console.log("🟢 Settings: Integrations:", response)
         const data = response.integrations || response.data || response || []
-        setIntegrations(Array.isArray(data) ? data : [])
+        setApiIntegrations(Array.isArray(data) ? data : [])
       } catch (err: any) {
         console.error("❌ Settings: Failed to fetch integrations:", err)
       } finally {
@@ -1457,23 +1488,57 @@ function IntegrationsSection() {
     fetchIntegrations()
   }, [])
 
-  // Fallback data
-  const connectedIntegrations = integrations.filter((i: any) => i.connected || i.status === "connected")
-  const availableIntegrations = integrations.filter((i: any) => !i.connected && i.status !== "connected")
+  // Merge static platform definitions with API data
+  const mergedPlatforms = PLATFORMS.map((platform) => {
+    const apiData = apiIntegrations.find((i: any) => i.id === platform.id || i.name?.toLowerCase() === platform.name.toLowerCase())
+    const isConnected = apiData ? (apiData.connected || apiData.status === "connected") : false
+    return {
+      ...platform,
+      connected: isConnected,
+      accountName: apiData?.accountName || apiData?.pageName || apiData?.account_name || null,
+      lastSync: apiData?.lastSync || null,
+    }
+  })
 
-  const fallbackConnected = [
-    { id: "brevo", name: "Brevo (Sendinblue)", icon: "📧", color: "bg-[#3B82F6]/10", lastSync: "منذ ساعتين" },
-    { id: "instagram", name: "Instagram", icon: "📷", color: "bg-gradient-to-br from-[#E4405F] via-[#F77737] to-[#FCAF45]", lastSync: "منذ 5 دقائق" },
-    { id: "facebook", name: "Facebook", icon: "📘", color: "bg-[#1877F2]/10", lastSync: "منذ 10 دقائق" },
-  ]
+  const handleConnect = async (platformId: string) => {
+    try {
+      console.log("🔵 Settings: Connecting integration:", platformId)
+      await integrationsAPI.connect(platformId, {})
+      // Refresh integrations list
+      const response = await integrationsAPI.getAll()
+      const data = response.integrations || response.data || response || []
+      setApiIntegrations(Array.isArray(data) ? data : [])
+    } catch (err: any) {
+      console.error("❌ Settings: Failed to connect:", err)
+      alert(err.message || "فشل الربط")
+    }
+  }
 
-  const fallbackAvailable = [
-    { id: "linkedin", name: "LinkedIn", icon: "💼", color: "bg-[#0077B5]/10" },
-    { id: "twitter", name: "Twitter", icon: "🐦", color: "bg-[#1DA1F2]/10" },
-  ]
+  const handleDisconnect = async (platform: any) => {
+    if (confirm(`هل تريد فصل ${platform.name}؟`)) {
+      try {
+        console.log("🔵 Settings: Disconnecting:", platform.id)
+        await integrationsAPI.disconnect(platform.id)
+        setApiIntegrations(prev => prev.filter((i: any) => i.id !== platform.id))
+      } catch (err: any) {
+        console.error("❌ Settings: Failed to disconnect:", err)
+        alert(err.message || "فشل فصل التكامل")
+      }
+    }
+  }
 
-  const displayConnected = connectedIntegrations.length > 0 ? connectedIntegrations : fallbackConnected
-  const displayAvailable = availableIntegrations.length > 0 ? availableIntegrations : fallbackAvailable
+  const handleOpenSettings = async (platform: any) => {
+    setSettingsModal({ open: true, integration: platform, settings: null, loading: true })
+    try {
+      console.log("🔵 Settings: Fetching settings for:", platform.id)
+      const response = await integrationsAPI.getSettings(platform.id)
+      console.log("🟢 Settings: Got settings:", response)
+      setSettingsModal(prev => ({ ...prev, settings: response.settings || response.data || response, loading: false }))
+    } catch (err: any) {
+      console.error("❌ Settings: Failed to fetch settings:", err)
+      setSettingsModal(prev => ({ ...prev, settings: {}, loading: false }))
+    }
+  }
 
   return (
     <div className="p-8">
@@ -1482,106 +1547,85 @@ function IntegrationsSection() {
         <p className="text-gray-600">ربط حسابك مع المنصات والخدمات الأخرى</p>
       </div>
 
-      {/* Connected Integrations */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">التكاملات المتصلة</h3>
-
-        {loading ? (
-          <div className="animate-pulse space-y-3">
-            <div className="h-16 bg-gray-200 rounded"></div>
-            <div className="h-16 bg-gray-200 rounded"></div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {displayConnected.map((integration: any) => (
-              <div key={integration.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 ${integration.color || "bg-gray-100"} rounded-lg flex items-center justify-center`}>
-                    <span className="text-2xl">{integration.icon}</span>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900">{integration.name}</h4>
-                    <p className="text-sm text-gray-600">آخر مزامنة: {integration.lastSync || "غير متوفر"}</p>
-                  </div>
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-white rounded-xl border border-gray-200 p-6 animate-pulse">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-14 h-14 bg-gray-200 rounded-xl"></div>
+                <div className="space-y-2 flex-1">
+                  <div className="h-5 bg-gray-200 rounded w-24"></div>
+                  <div className="h-4 bg-gray-200 rounded w-40"></div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="px-3 py-1 bg-[#10B981]/10 text-[#10B981] rounded-full text-xs font-medium">متصل</span>
+              </div>
+              <div className="h-10 bg-gray-200 rounded-lg"></div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {mergedPlatforms.map((platform) => (
+            <div
+              key={platform.id}
+              className={`bg-white rounded-xl border ${platform.connected ? "border-[#10B981]/30" : "border-gray-200"} p-6 transition-shadow hover:shadow-md`}
+            >
+              {/* Platform Header */}
+              <div className="flex items-start gap-4 mb-5">
+                <div className={`w-14 h-14 ${platform.iconBg} rounded-xl flex items-center justify-center shrink-0 shadow-sm`}>
+                  <span className="text-3xl">{platform.icon}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h4 className="font-bold text-gray-900 text-lg">{platform.name}</h4>
+                    {platform.connected && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-[#10B981]/10 text-[#10B981] rounded-full text-xs font-semibold">
+                        <span className="w-1.5 h-1.5 bg-[#10B981] rounded-full"></span>
+                        متصل
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-500 leading-relaxed">{platform.description}</p>
+                </div>
+              </div>
+
+              {/* Connected Account Info */}
+              {platform.connected && platform.accountName && (
+                <div className="mb-4 px-3 py-2.5 bg-gray-50 rounded-lg border border-gray-100">
+                  <p className="text-sm text-gray-600">
+                    <span className="text-gray-400 ml-1">الحساب:</span>
+                    <span className="font-medium text-gray-800">{platform.accountName}</span>
+                  </p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              {platform.connected ? (
+                <div className="flex gap-2">
                   <button
-                    onClick={async () => {
-                      setSettingsModal({ open: true, integration, settings: null, loading: true })
-                      try {
-                        console.log("🔵 Settings: Fetching settings for:", integration.id)
-                        const response = await integrationsAPI.getSettings(integration.id)
-                        console.log("🟢 Settings: Got settings:", response)
-                        setSettingsModal(prev => ({ ...prev, settings: response.settings || response.data || response, loading: false }))
-                      } catch (err: any) {
-                        console.error("❌ Settings: Failed to fetch settings:", err)
-                        setSettingsModal(prev => ({ ...prev, settings: {}, loading: false }))
-                      }
-                    }}
-                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
+                    onClick={() => handleOpenSettings(platform)}
+                    className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-semibold transition-colors"
                   >
                     إعدادات
                   </button>
                   <button
-                    onClick={async () => {
-                      if (confirm(`هل تريد فصل ${integration.name}؟`)) {
-                        try {
-                          console.log("🔵 Settings: Disconnecting:", integration.id)
-                          await integrationsAPI.disconnect(integration.id)
-                          setIntegrations(prev => prev.filter((i: any) => i.id !== integration.id))
-                          alert(`تم فصل ${integration.name} بنجاح`)
-                        } catch (err: any) {
-                          console.error("❌ Settings: Failed to disconnect:", err)
-                          alert(err.message || "فشل فصل التكامل")
-                        }
-                      }
-                    }}
-                    className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 text-sm font-medium"
+                    onClick={() => handleDisconnect(platform)}
+                    className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-semibold transition-colors"
                   >
-                    فصل
+                    إدارة
                   </button>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Available Integrations */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">التكاملات المتاحة</h3>
-
-        <div className="grid grid-cols-2 gap-4">
-          {displayAvailable.map((integration: any) => (
-            <div key={integration.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-[#7C3AED] transition-colors cursor-pointer">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 ${integration.color || "bg-gray-100"} rounded-lg flex items-center justify-center`}>
-                  <span className="text-xl">{integration.icon}</span>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-900 text-sm">{integration.name}</h4>
-                </div>
-              </div>
-              <button
-                onClick={async () => {
-                  try {
-                    console.log("🔵 Settings: Connecting integration:", integration.id)
-                    await integrationsAPI.connect(integration.id, {})
-                    alert(`تم ربط ${integration.name} بنجاح`)
-                  } catch (err: any) {
-                    console.error("❌ Settings: Failed to connect:", err)
-                    alert(err.message || "فشل الربط")
-                  }
-                }}
-                className="px-3 py-1 bg-[#7C3AED] text-white rounded-lg hover:bg-[#7C3AED]/90 text-sm font-medium"
-              >
-                ربط
-              </button>
+              ) : (
+                <button
+                  onClick={() => handleConnect(platform.id)}
+                  className="w-full px-4 py-2.5 bg-[#7C3AED] text-white rounded-lg hover:bg-[#6D28D9] text-sm font-semibold transition-colors"
+                >
+                  ربط الحساب
+                </button>
+              )}
             </div>
           ))}
         </div>
-      </div>
+      )}
 
       {/* Settings Modal */}
       {settingsModal.open && (
@@ -1589,7 +1633,7 @@ function IntegrationsSection() {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 ${settingsModal.integration?.color || "bg-gray-100"} rounded-lg flex items-center justify-center`}>
+                <div className={`w-10 h-10 ${settingsModal.integration?.iconBg || "bg-gray-100"} rounded-lg flex items-center justify-center`}>
                   <span className="text-xl">{settingsModal.integration?.icon}</span>
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900">إعدادات {settingsModal.integration?.name}</h3>
@@ -1612,6 +1656,12 @@ function IntegrationsSection() {
                     <span className="text-sm text-gray-600">متصل ويعمل بشكل طبيعي</span>
                   </div>
                 </div>
+                {settingsModal.integration?.accountName && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">الحساب المتصل</label>
+                    <p className="text-sm text-gray-600">{settingsModal.integration.accountName}</p>
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">آخر مزامنة</label>
                   <p className="text-sm text-gray-600">{settingsModal.integration?.lastSync || "غير متوفر"}</p>
@@ -1623,7 +1673,7 @@ function IntegrationsSection() {
                 <div className="pt-4 border-t border-gray-200 flex gap-2">
                   <button
                     onClick={() => setSettingsModal({ open: false, integration: null, settings: null, loading: false })}
-                    className="flex-1 px-4 py-2 bg-[#7C3AED] text-white rounded-lg hover:bg-[#7C3AED]/90 text-sm font-medium"
+                    className="flex-1 px-4 py-2 bg-[#7C3AED] text-white rounded-lg hover:bg-[#6D28D9] text-sm font-medium"
                   >
                     إغلاق
                   </button>
@@ -1632,9 +1682,8 @@ function IntegrationsSection() {
                       if (confirm(`هل تريد فصل ${settingsModal.integration?.name}؟`)) {
                         try {
                           await integrationsAPI.disconnect(settingsModal.integration?.id)
-                          setIntegrations(prev => prev.filter((i: any) => i.id !== settingsModal.integration?.id))
+                          setApiIntegrations(prev => prev.filter((i: any) => i.id !== settingsModal.integration?.id))
                           setSettingsModal({ open: false, integration: null, settings: null, loading: false })
-                          alert(`تم فصل ${settingsModal.integration?.name} بنجاح`)
                         } catch (err: any) {
                           alert(err.message || "فشل فصل التكامل")
                         }
