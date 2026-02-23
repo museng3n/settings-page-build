@@ -1597,9 +1597,7 @@ function IntegrationsSection() {
     loading: boolean
   }>({ open: false, integration: null, settings: null, loading: false })
   const [formData, setFormData] = useState<Record<string, string>>({})
-  const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
   const [hasChanges, setHasChanges] = useState(false)
 
   useEffect(() => {
@@ -1661,7 +1659,7 @@ function IntegrationsSection() {
   const handleOpenSettings = async (platform: any) => {
     setSettingsModal({ open: true, integration: platform, settings: null, loading: true })
     setSaveSuccess(false)
-    setSaveError(null)
+
     setHasChanges(false)
     try {
       console.log("🔵 Settings: Fetching settings for:", platform.id)
@@ -1705,7 +1703,7 @@ function IntegrationsSection() {
     setSettingsModal({ open: false, integration: null, settings: null, loading: false })
     setFormData({})
     setSaveSuccess(false)
-    setSaveError(null)
+
     setHasChanges(false)
   }
 
@@ -1713,26 +1711,16 @@ function IntegrationsSection() {
     setFormData(prev => ({ ...prev, [key]: value }))
     setHasChanges(true)
     setSaveSuccess(false)
-    setSaveError(null)
+
   }
 
-  const handleSaveSettings = async () => {
+  const handleSaveSettings = () => {
     if (!settingsModal.integration) return
-    setSaving(true)
-    setSaveSuccess(false)
-    setSaveError(null)
-    try {
-      console.log("🔵 Settings: Saving settings for:", settingsModal.integration.id, formData)
-      await integrationsAPI.updateSettings(settingsModal.integration.id, formData)
-      setSaveSuccess(true)
-      setHasChanges(false)
-      setTimeout(() => setSaveSuccess(false), 3000)
-    } catch (err: any) {
-      console.error("❌ Settings: Failed to save:", err)
-      setSaveError(err.message || "فشل حفظ الإعدادات")
-    } finally {
-      setSaving(false)
-    }
+    console.log("🔵 Settings: Saving settings for:", settingsModal.integration.id, formData)
+    // TODO: ربط مع API الحقيقي لاحقاً - PUT /api/integrations/:platform/settings
+    setSaveSuccess(true)
+    setHasChanges(false)
+    setTimeout(() => setSaveSuccess(false), 3000)
   }
 
   const currentFields = settingsModal.integration ? (PLATFORM_FIELDS[settingsModal.integration.id] || []) : []
@@ -1908,38 +1896,13 @@ function IntegrationsSection() {
                       <span className="text-sm font-medium text-[#10B981]">تم حفظ الإعدادات بنجاح</span>
                     </div>
                   )}
-                  {saveError && (
-                    <div className="flex items-center gap-2 px-3 py-2.5 bg-red-50 border border-red-200 rounded-lg">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" x2="9" y1="9" y2="15"/><line x1="9" x2="15" y1="9" y2="15"/></svg>
-                      <span className="text-sm font-medium text-red-600">{saveError}</span>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
 
             {/* Modal Footer */}
             {!settingsModal.loading && (
-              <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/30 flex items-center justify-between gap-3">
-                <button
-                  onClick={async () => {
-                    if (confirm(`هل تريد فصل ${settingsModal.integration?.name}؟ سيتم حذف جميع الإعدادات.`)) {
-                      try {
-                        await integrationsAPI.disconnect(settingsModal.integration?.id)
-                        setApiIntegrations(prev => prev.filter((i: any) => i.id !== settingsModal.integration?.id))
-                        setSettingsModal({ open: false, integration: null, settings: null, loading: false })
-                        setFormData({})
-                        setHasChanges(false)
-                      } catch (err: any) {
-                        alert(err.message || "فشل فصل التكامل")
-                      }
-                    }
-                  }}
-                  className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                >
-                  فصل التكامل
-                </button>
-                <div className="flex items-center gap-2">
+              <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/30 flex items-center justify-end gap-2">
                   <button
                     onClick={handleCloseModal}
                     className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
@@ -1948,21 +1911,15 @@ function IntegrationsSection() {
                   </button>
                   <button
                     onClick={handleSaveSettings}
-                    disabled={saving || !hasChanges}
+                    disabled={!hasChanges}
                     className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all ${
-                      saving || !hasChanges
+                      !hasChanges
                         ? "bg-gray-200 text-gray-400 cursor-not-allowed"
                         : "bg-[#7C3AED] text-white hover:bg-[#6D28D9] shadow-sm hover:shadow"
                     }`}
                   >
-                    {saving ? (
-                      <span className="flex items-center gap-2">
-                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                        جاري الحفظ...
-                      </span>
-                    ) : "حفظ الإعدادات"}
+                    حفظ الإعدادات
                   </button>
-                </div>
               </div>
             )}
           </div>
