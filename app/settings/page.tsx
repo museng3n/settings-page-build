@@ -1437,6 +1437,7 @@ function AutomationSection() {
 function IntegrationsSection() {
   const [integrations, setIntegrations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [settingsModal, setSettingsModal] = useState<{ open: boolean; integration: any; settings: any; loading: boolean }>({ open: false, integration: null, settings: null, loading: false })
 
   useEffect(() => {
     const fetchIntegrations = async () => {
@@ -1463,6 +1464,7 @@ function IntegrationsSection() {
   const fallbackConnected = [
     { id: "brevo", name: "Brevo (Sendinblue)", icon: "📧", color: "bg-[#3B82F6]/10", lastSync: "منذ ساعتين" },
     { id: "instagram", name: "Instagram", icon: "📷", color: "bg-gradient-to-br from-[#E4405F] via-[#F77737] to-[#FCAF45]", lastSync: "منذ 5 دقائق" },
+    { id: "facebook", name: "Facebook", icon: "📘", color: "bg-[#1877F2]/10", lastSync: "منذ 10 دقائق" },
   ]
 
   const fallbackAvailable = [
@@ -1504,8 +1506,40 @@ function IntegrationsSection() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="px-3 py-1 bg-[#10B981]/10 text-[#10B981] rounded-full text-xs font-medium">متصل</span>
-                  <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium">
+                  <button
+                    onClick={async () => {
+                      setSettingsModal({ open: true, integration, settings: null, loading: true })
+                      try {
+                        console.log("🔵 Settings: Fetching settings for:", integration.id)
+                        const response = await integrationsAPI.getSettings(integration.id)
+                        console.log("🟢 Settings: Got settings:", response)
+                        setSettingsModal(prev => ({ ...prev, settings: response.settings || response.data || response, loading: false }))
+                      } catch (err: any) {
+                        console.error("❌ Settings: Failed to fetch settings:", err)
+                        setSettingsModal(prev => ({ ...prev, settings: {}, loading: false }))
+                      }
+                    }}
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
+                  >
                     إعدادات
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (confirm(`هل تريد فصل ${integration.name}؟`)) {
+                        try {
+                          console.log("🔵 Settings: Disconnecting:", integration.id)
+                          await integrationsAPI.disconnect(integration.id)
+                          setIntegrations(prev => prev.filter((i: any) => i.id !== integration.id))
+                          alert(`تم فصل ${integration.name} بنجاح`)
+                        } catch (err: any) {
+                          console.error("❌ Settings: Failed to disconnect:", err)
+                          alert(err.message || "فشل فصل التكامل")
+                        }
+                      }
+                    }}
+                    className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 text-sm font-medium"
+                  >
+                    فصل
                   </button>
                 </div>
               </div>
@@ -1548,6 +1582,74 @@ function IntegrationsSection() {
           ))}
         </div>
       </div>
+
+      {/* Settings Modal */}
+      {settingsModal.open && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setSettingsModal({ open: false, integration: null, settings: null, loading: false })}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 ${settingsModal.integration?.color || "bg-gray-100"} rounded-lg flex items-center justify-center`}>
+                  <span className="text-xl">{settingsModal.integration?.icon}</span>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">إعدادات {settingsModal.integration?.name}</h3>
+              </div>
+              <button onClick={() => setSettingsModal({ open: false, integration: null, settings: null, loading: false })} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+            </div>
+
+            {settingsModal.loading ? (
+              <div className="animate-pulse space-y-3">
+                <div className="h-10 bg-gray-200 rounded"></div>
+                <div className="h-10 bg-gray-200 rounded"></div>
+                <div className="h-10 bg-gray-200 rounded"></div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">الحالة</label>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 bg-[#10B981] rounded-full"></span>
+                    <span className="text-sm text-gray-600">متصل ويعمل بشكل طبيعي</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">آخر مزامنة</label>
+                  <p className="text-sm text-gray-600">{settingsModal.integration?.lastSync || "غير متوفر"}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">المزامنة التلقائية</label>
+                  <p className="text-sm text-gray-600">مفعّلة - كل 15 دقيقة</p>
+                </div>
+                <div className="pt-4 border-t border-gray-200 flex gap-2">
+                  <button
+                    onClick={() => setSettingsModal({ open: false, integration: null, settings: null, loading: false })}
+                    className="flex-1 px-4 py-2 bg-[#7C3AED] text-white rounded-lg hover:bg-[#7C3AED]/90 text-sm font-medium"
+                  >
+                    إغلاق
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (confirm(`هل تريد فصل ${settingsModal.integration?.name}؟`)) {
+                        try {
+                          await integrationsAPI.disconnect(settingsModal.integration?.id)
+                          setIntegrations(prev => prev.filter((i: any) => i.id !== settingsModal.integration?.id))
+                          setSettingsModal({ open: false, integration: null, settings: null, loading: false })
+                          alert(`تم فصل ${settingsModal.integration?.name} بنجاح`)
+                        } catch (err: any) {
+                          alert(err.message || "فشل فصل التكامل")
+                        }
+                      }
+                    }}
+                    className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 text-sm font-medium"
+                  >
+                    فصل التكامل
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
