@@ -1587,15 +1587,6 @@ const PLATFORM_FIELDS: Record<string, SettingsField[]> = {
   ],
 }
 
-// توليد رمز تحقق عشوائي
-function generateVerifyToken(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-  let result = "trig_verify_"
-  for (let i = 0; i < 24; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return result
-}
 
 // مكوّن حقل كلمة المرور مع زر إظهار/إخفاء + نسخ
 function SecureField({ value, onChange, placeholder, readOnly = false }: { value: string; onChange?: (val: string) => void; placeholder?: string; readOnly?: boolean }) {
@@ -1744,15 +1735,11 @@ function IntegrationsSection() {
       const settings = response.settings || response.data || response || {}
       setSettingsModal(prev => ({ ...prev, settings, loading: false }))
 
-      // تعبئة البيانات من الـ API مع توليد webhook token إذا لم يوجد
+      // تعبئة البيانات من الـ API - رمز التحقق يأتي من الباك إند
       const fields = PLATFORM_FIELDS[platform.id] || []
       const initial: Record<string, string> = {}
       fields.forEach((field) => {
-        if (field.type === "readonly" && field.key === "webhookVerifyToken") {
-          initial[field.key] = settings[field.key] || generateVerifyToken()
-        } else {
-          initial[field.key] = settings[field.key] || ""
-        }
+        initial[field.key] = settings[field.key] || ""
       })
       setFormData(initial)
     } catch (err: any) {
@@ -1761,11 +1748,7 @@ function IntegrationsSection() {
       const fields = PLATFORM_FIELDS[platform.id] || []
       const initial: Record<string, string> = {}
       fields.forEach((field) => {
-        if (field.type === "readonly" && field.key === "webhookVerifyToken") {
-          initial[field.key] = generateVerifyToken()
-        } else {
-          initial[field.key] = ""
-        }
+        initial[field.key] = ""
       })
       setFormData(initial)
       setSettingsModal(prev => ({ ...prev, settings: {}, loading: false }))
