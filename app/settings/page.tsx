@@ -1632,19 +1632,6 @@ function IntegrationsSection() {
     }
   })
 
-  const handleConnect = async (platformId: string) => {
-    try {
-      console.log("🔵 Settings: Connecting integration:", platformId)
-      await integrationsAPI.connect(platformId, {})
-      const response = await integrationsAPI.getAll()
-      const data = response.integrations || response.data || response || []
-      setApiIntegrations(Array.isArray(data) ? data : [])
-    } catch (err: any) {
-      console.error("❌ Settings: Failed to connect:", err)
-      alert(err.message || "فشل الربط")
-    }
-  }
-
   const handleDisconnect = async (platform: any) => {
     if (confirm(`هل تريد فصل ${platform.name}؟`)) {
       try {
@@ -1813,7 +1800,7 @@ function IntegrationsSection() {
                 </div>
               ) : (
                 <button
-                  onClick={() => handleConnect(platform.id)}
+                  onClick={() => handleOpenSettings(platform)}
                   className="w-full px-4 py-2.5 bg-[#7C3AED] text-white rounded-lg hover:bg-[#6D28D9] text-sm font-semibold transition-colors"
                 >
                   ربط الحساب
