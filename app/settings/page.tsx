@@ -382,10 +382,37 @@ function NavButton({
   )
 }
 
+// Shared inline toast component used across all sections
+function InlineToast({ message, type, onDismiss }: { message: string; type: "success" | "error"; onDismiss: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onDismiss, 4000)
+    return () => clearTimeout(timer)
+  }, [onDismiss])
+
+  return (
+    <div className={`flex items-center justify-between gap-2 px-4 py-3 rounded-lg text-sm font-medium ${
+      type === "success"
+        ? "bg-[#10B981]/10 border border-[#10B981]/20 text-[#10B981]"
+        : "bg-red-50 border border-red-200 text-red-600"
+    }`}>
+      <span>{message}</span>
+      <button onClick={onDismiss} className="shrink-0 opacity-60 hover:opacity-100">✕</button>
+    </div>
+  )
+}
+
+function useToast() {
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null)
+  const showToast = useCallback((message: string, type: "success" | "error") => setToast({ message, type }), [])
+  const clearToast = useCallback(() => setToast(null), [])
+  return { toast, showToast, clearToast }
+}
+
 // SECTION 1: Account
 function AccountSection({ currentUser }: { currentUser: User }) {
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
+  const { toast, showToast, clearToast } = useToast()
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
@@ -448,6 +475,8 @@ function AccountSection({ currentUser }: { currentUser: User }) {
         <p className="text-gray-600">إدارة معلوماتك الشخصية وتفضيلاتك</p>
       </div>
 
+      {toast && <div className="mb-4"><InlineToast message={toast.message} type={toast.type} onDismiss={clearToast} /></div>}
+
       {/* Save Message */}
       {saveMsg && (
         <div className={`mb-4 p-3 rounded-lg text-sm font-medium ${
@@ -477,11 +506,11 @@ function AccountSection({ currentUser }: { currentUser: User }) {
                 const file = e.target.files?.[0]
                 if (file) {
                   if (!file.type.startsWith("image/")) {
-                    alert("الرجاء اختيار صورة فقط (JPG, PNG, GIF)")
+                    showToast("الرجاء اختيار صورة فقط (JPG, PNG, GIF)", "error")
                     return
                   }
                   if (file.size > 2 * 1024 * 1024) {
-                    alert("حجم الصورة يجب أن يكون أقل من 2 ميجابايت")
+                    showToast("حجم الصورة يجب أن يكون أقل من 2 ميجابايت", "error")
                     return
                   }
                   // Show preview immediately
@@ -627,10 +656,10 @@ function AccountSection({ currentUser }: { currentUser: User }) {
             try {
               console.log("🔵 Settings: Requesting password change...")
               await settingsAPI.changePassword({ requestReset: true })
-              alert("تم إرسال رابط تغيير كلمة المرور إلى بريدك الإلكتروني")
+              showToast("تم إرسال رابط تغيير كلمة المرور إلى بريدك الإلكتروني", "success")
             } catch (err: any) {
               console.error("❌ Settings: Password change failed:", err)
-              alert(err.message || "فشل طلب تغيير كلمة المرور")
+              showToast(err.message || "فشل طلب تغيير كلمة المرور", "error")
             }
           }}
           className="px-6 py-2 border border-[#7C3AED] text-[#7C3AED] rounded-lg hover:bg-[#7C3AED]/10 font-medium"
@@ -647,6 +676,8 @@ function BillingSection() {
   const [subscription, setSubscription] = useState<any>(null)
   const [invoices, setInvoices] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const { toast, showToast, clearToast } = useToast()
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
 
   useEffect(() => {
     const fetchBilling = async () => {
@@ -675,6 +706,8 @@ function BillingSection() {
         <h2 className="text-2xl font-bold text-gray-900 mb-2">الاشتراك والفواتير</h2>
         <p className="text-gray-600">إدارة خطة الاشتراك ومعلومات الفواتير</p>
       </div>
+
+      {toast && <div className="mb-4"><InlineToast message={toast.message} type={toast.type} onDismiss={clearToast} /></div>}
 
       {/* Current Plan */}
       <div className="bg-gradient-to-br from-[#7C3AED] to-[#7C3AED]/80 rounded-lg p-8 mb-6 text-white">
@@ -715,32 +748,49 @@ function BillingSection() {
               try {
                 console.log("🔵 Settings: Upgrading plan...")
                 await billingAPI.upgradePlan("agency")
-                alert("تم طلب الترقية بنجاح")
+                showToast("تم طلب الترقية بنجاح", "success")
               } catch (err: any) {
                 console.error("❌ Settings: Upgrade failed:", err)
-                alert(err.message || "فشل طلب الترقية")
+                showToast(err.message || "فشل طلب الترقية", "error")
               }
             }}
             className="px-6 py-3 bg-white text-[#7C3AED] rounded-lg hover:bg-purple-50 font-semibold"
           >
             الترقية إلى خطة الوكالة
           </button>
-          <button
-            onClick={async () => {
-              if (!confirm("هل أنت متأكد من إلغاء الاشتراك؟")) return
-              try {
-                console.log("🔵 Settings: Cancelling subscription...")
-                await billingAPI.cancelSubscription()
-                alert("تم إلغاء الاشتراك")
-              } catch (err: any) {
-                console.error("❌ Settings: Cancel failed:", err)
-                alert(err.message || "فشل إلغاء الاشتراك")
-              }
-            }}
-            className="px-6 py-3 bg-white/10 backdrop-blur-sm text-white rounded-lg hover:bg-white/20 font-semibold"
-          >
-            إلغاء الاشتراك
-          </button>
+          {showCancelConfirm ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={async () => {
+                  try {
+                    console.log("🔵 Settings: Cancelling subscription...")
+                    await billingAPI.cancelSubscription()
+                    showToast("تم إلغاء الاشتراك", "success")
+                    setShowCancelConfirm(false)
+                  } catch (err: any) {
+                    console.error("❌ Settings: Cancel failed:", err)
+                    showToast(err.message || "فشل إلغاء الاشتراك", "error")
+                  }
+                }}
+                className="px-5 py-3 bg-[#EF4444] text-white rounded-lg hover:bg-[#EF4444]/90 font-semibold"
+              >
+                تأكيد الإلغاء
+              </button>
+              <button
+                onClick={() => setShowCancelConfirm(false)}
+                className="px-5 py-3 bg-white/10 backdrop-blur-sm text-white rounded-lg hover:bg-white/20 font-semibold"
+              >
+                تراجع
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowCancelConfirm(true)}
+              className="px-6 py-3 bg-white/10 backdrop-blur-sm text-white rounded-lg hover:bg-white/20 font-semibold"
+            >
+              إلغاء الاشتراك
+            </button>
+          )}
         </div>
 
         <div className="mt-4 pt-4 border-t border-white/20">
@@ -1016,6 +1066,10 @@ function WorkspaceSection() {
 function TeamSection({ currentUser }: { currentUser: User }) {
   const [teamMembers, setTeamMembers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const { toast, showToast, clearToast } = useToast()
+  const [showInviteInput, setShowInviteInput] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState("")
+  const [inviting, setInviting] = useState(false)
 
   useEffect(() => {
     const fetchTeam = async () => {
@@ -1059,6 +1113,8 @@ function TeamSection({ currentUser }: { currentUser: User }) {
         <p className="text-gray-600">إدارة أعضاء الفريق وصلاحيات الوصول</p>
       </div>
 
+      {toast && <div className="mb-4"><InlineToast message={toast.message} type={toast.type} onDismiss={clearToast} /></div>}
+
       {/* Your Role Card */}
       <div className="bg-gradient-to-br from-[#7C3AED] to-[#7C3AED]/80 rounded-lg p-6 mb-6 text-white">
         <div className="flex items-start justify-between mb-4">
@@ -1095,18 +1151,7 @@ function TeamSection({ currentUser }: { currentUser: User }) {
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold text-gray-900">أعضاء الفريق ({displayMembers.length})</h3>
           <button
-            onClick={async () => {
-              const email = prompt("أدخل البريد الإلكتروني للعضو الجديد:")
-              if (!email) return
-              try {
-                console.log("🔵 Settings: Inviting team member:", email)
-                await teamAPI.inviteMember({ email, role: "member" })
-                alert("تم إرسال الدعوة بنجاح")
-              } catch (err: any) {
-                console.error("❌ Settings: Failed to invite:", err)
-                alert(err.message || "فشل إرسال الدعوة")
-              }
-            }}
+            onClick={() => setShowInviteInput(true)}
             className="px-4 py-2 bg-[#7C3AED] text-white rounded-lg hover:bg-[#7C3AED]/90 font-medium flex items-center gap-2"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1115,6 +1160,49 @@ function TeamSection({ currentUser }: { currentUser: User }) {
             إضافة عضو
           </button>
         </div>
+
+        {showInviteInput && (
+          <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+            <label className="block text-sm font-medium text-gray-700 mb-2 text-right">البريد الإلكتروني للعضو الجديد</label>
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="example@email.com"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#7C3AED]/20 focus:border-[#7C3AED] outline-none"
+                dir="ltr"
+              />
+              <button
+                disabled={!inviteEmail || inviting}
+                onClick={async () => {
+                  try {
+                    setInviting(true)
+                    console.log("🔵 Settings: Inviting team member:", inviteEmail)
+                    await teamAPI.inviteMember({ email: inviteEmail, role: "member" })
+                    showToast("تم إرسال الدعوة بنجاح", "success")
+                    setInviteEmail("")
+                    setShowInviteInput(false)
+                  } catch (err: any) {
+                    console.error("❌ Settings: Failed to invite:", err)
+                    showToast(err.message || "فشل إرسال الدعوة", "error")
+                  } finally {
+                    setInviting(false)
+                  }
+                }}
+                className="px-4 py-2 bg-[#7C3AED] text-white rounded-lg hover:bg-[#7C3AED]/90 font-medium text-sm disabled:opacity-50"
+              >
+                {inviting ? "جاري الإرسال..." : "إرسال الدعوة"}
+              </button>
+              <button
+                onClick={() => { setShowInviteInput(false); setInviteEmail("") }}
+                className="px-3 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 text-sm"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="animate-pulse space-y-3">
@@ -1177,9 +1265,9 @@ function TeamSection({ currentUser }: { currentUser: User }) {
                                 try {
                                   console.log("🔵 Settings: Resending invite to:", member.email)
                                   await teamAPI.resendInvite(member.id)
-                                  alert("تم إعادة إرسال الدعوة")
+                                  showToast("تم إعادة إرسال الدعوة", "success")
                                 } catch (err: any) {
-                                  alert(err.message || "فشل إعادة الإرسال")
+                                  showToast(err.message || "فشل إعادة الإرسال", "error")
                                 }
                               }}
                               className="px-3 py-1 border border-[#7C3AED] text-[#7C3AED] rounded-lg hover:bg-[#7C3AED]/10 text-xs font-medium"
@@ -1191,9 +1279,9 @@ function TeamSection({ currentUser }: { currentUser: User }) {
                                 try {
                                   console.log("🔵 Settings: Cancelling invite for:", member.email)
                                   await teamAPI.cancelInvite(member.id)
-                                  alert("تم إلغاء الدعوة")
+                                  showToast("تم إلغاء الدعوة", "success")
                                 } catch (err: any) {
-                                  alert(err.message || "فشل إلغاء الدعوة")
+                                  showToast(err.message || "فشل إلغاء الدعوة", "error")
                                 }
                               }}
                               className="px-3 py-1 border border-[#EF4444] text-[#EF4444] rounded-lg hover:bg-[#EF4444]/10 text-xs font-medium"
@@ -1335,6 +1423,7 @@ function TeamSection({ currentUser }: { currentUser: User }) {
 // SECTION 5: Automation
 function AutomationSection() {
   const [saving, setSaving] = useState(false)
+  const { toast, showToast, clearToast } = useToast()
   const [autoReply, setAutoReply] = useState(true)
   const [autoTag, setAutoTag] = useState(true)
   const [autoReplyMsg, setAutoReplyMsg] = useState("شكراً لتواصلك معنا! نحن حالياً خارج ساعات العمل، ولكن سنرد على رسالتك في أقرب وقت ممكن.")
@@ -1364,10 +1453,10 @@ function AutomationSection() {
       console.log("🔵 Settings: Saving automation settings...")
       await settingsAPI.updateAutomation({ autoReply, autoTag, autoReplyMessage: autoReplyMsg })
       console.log("🟢 Settings: Automation saved")
-      alert("تم حفظ الإعدادات بنجاح")
+      showToast("تم حفظ الإعدادات بنجاح", "success")
     } catch (err: any) {
       console.error("❌ Settings: Failed to save automation:", err)
-      alert(err.message || "فشل حفظ الإعدادات")
+      showToast(err.message || "فشل حفظ الإعدادات", "error")
     } finally {
       setSaving(false)
     }
@@ -1379,6 +1468,8 @@ function AutomationSection() {
         <h2 className="text-2xl font-bold text-gray-900 mb-2">إعدادات الأتمتة</h2>
         <p className="text-gray-600">تكوين قواعد الأتمتة والردود التلقائية</p>
       </div>
+
+      {toast && <div className="mb-4"><InlineToast message={toast.message} type={toast.type} onDismiss={clearToast} /></div>}
 
       <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
         <div className="flex items-center justify-between mb-4">
@@ -1990,6 +2081,7 @@ function IntegrationsSection() {
 // SECTION 7: Notifications
 function NotificationsSection() {
   const [saving, setSaving] = useState(false)
+  const { toast, showToast, clearToast } = useToast()
   const [newCampaigns, setNewCampaigns] = useState(true)
   const [newLeads, setNewLeads] = useState(true)
   const [billingUpdates, setBillingUpdates] = useState(true)
@@ -2026,10 +2118,10 @@ function NotificationsSection() {
         browserNotifications: browserNotifs,
       })
       console.log("🟢 Settings: Notifications saved")
-      alert("تم حفظ الإعدادات بنجاح")
+      showToast("تم حفظ الإعدادات بنجاح", "success")
     } catch (err: any) {
       console.error("❌ Settings: Failed to save notifications:", err)
-      alert(err.message || "فشل حفظ الإعدادات")
+      showToast(err.message || "فشل حفظ الإعدادات", "error")
     } finally {
       setSaving(false)
     }
@@ -2053,6 +2145,8 @@ function NotificationsSection() {
         <h2 className="text-2xl font-bold text-gray-900 mb-2">الإشعارات</h2>
         <p className="text-gray-600">إدارة تفضيلات الإشعارات</p>
       </div>
+
+      {toast && <div className="mb-4"><InlineToast message={toast.message} type={toast.type} onDismiss={clearToast} /></div>}
 
       <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">إشعارات البريد الإلكتروني</h3>
@@ -2103,6 +2197,11 @@ function NotificationsSection() {
 function SecuritySection() {
   const [sessions, setSessions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const { toast, showToast, clearToast } = useToast()
+  const [showApiKeyInput, setShowApiKeyInput] = useState(false)
+  const [apiKeyName, setApiKeyName] = useState("")
+  const [creatingKey, setCreatingKey] = useState(false)
+  const [newApiKey, setNewApiKey] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchSecurity = async () => {
@@ -2134,6 +2233,8 @@ function SecuritySection() {
         <p className="text-gray-600">إدارة إعدادات الأمان والخصوصية</p>
       </div>
 
+      {toast && <div className="mb-4"><InlineToast message={toast.message} type={toast.type} onDismiss={clearToast} /></div>}
+
       <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">المصادقة الثنائية</h3>
         <p className="text-sm text-gray-600 mb-4">أضف طبقة إضافية من الأمان إلى حسابك</p>
@@ -2147,10 +2248,10 @@ function SecuritySection() {
             try {
               console.log("🔵 Settings: Enabling 2FA...")
               await securityAPI.enable2FA()
-              alert("تم تفعيل المصادقة الثنائية")
+              showToast("تم تفعيل المصادقة الثنائية", "success")
             } catch (err: any) {
               console.error("❌ Settings: 2FA enable failed:", err)
-              alert(err.message || "فشل تفعيل المصادقة الثنائية")
+              showToast(err.message || "فشل تفعيل المصادقة الثنائية", "error")
             }
           }}
           className="px-6 py-2 bg-[#7C3AED] text-white rounded-lg hover:bg-[#7C3AED]/90 font-medium"
@@ -2189,10 +2290,10 @@ function SecuritySection() {
                         console.log("🔵 Settings: Revoking session:", session.id)
                         await securityAPI.revokeSession(session.id)
                         setSessions((prev) => prev.filter((s: any) => s.id !== session.id))
-                        alert("تم إنهاء الجلسة")
+                        showToast("تم إنهاء الجلسة", "success")
                       } catch (err: any) {
                         console.error("❌ Settings: Failed to revoke session:", err)
-                        alert(err.message || "فشل إنهاء الجلسة")
+                        showToast(err.message || "فشل إنهاء الجلسة", "error")
                       }
                     }}
                     className="px-3 py-1 border border-[#EF4444] text-[#EF4444] rounded-lg hover:bg-[#EF4444]/10 text-sm font-medium"
@@ -2209,23 +2310,63 @@ function SecuritySection() {
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">مفاتيح API</h3>
         <p className="text-sm text-gray-600 mb-4">إدارة مفاتيح API للتكامل مع الأنظمة الخارجية</p>
-        <button
-          onClick={async () => {
-            const name = prompt("أدخل اسم مفتاح API:")
-            if (!name) return
-            try {
-              console.log("🔵 Settings: Creating API key:", name)
-              const response = await securityAPI.createAPIKey({ name })
-              alert(`تم إنشاء مفتاح API: ${response.key || response.apiKey || "تم بنجاح"}`)
-            } catch (err: any) {
-              console.error("❌ Settings: Failed to create API key:", err)
-              alert(err.message || "فشل إنشاء مفتاح API")
-            }
-          }}
-          className="px-6 py-2 border border-[#7C3AED] text-[#7C3AED] rounded-lg hover:bg-[#7C3AED]/10 font-medium"
-        >
-          إنشاء مفتاح API جديد
-        </button>
+
+        {newApiKey && (
+          <div className="mb-4 p-3 bg-[#10B981]/10 border border-[#10B981]/20 rounded-lg">
+            <p className="text-sm font-medium text-[#10B981] mb-1">تم إنشاء المفتاح بنجاح:</p>
+            <code className="text-xs bg-white px-2 py-1 rounded border border-gray-200 block break-all" dir="ltr">{newApiKey}</code>
+          </div>
+        )}
+
+        {showApiKeyInput ? (
+          <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+            <label className="block text-sm font-medium text-gray-700 mb-2 text-right">اسم مفتاح API</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={apiKeyName}
+                onChange={(e) => setApiKeyName(e.target.value)}
+                placeholder="مثال: مفتاح التكامل"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#7C3AED]/20 focus:border-[#7C3AED] outline-none"
+              />
+              <button
+                disabled={!apiKeyName || creatingKey}
+                onClick={async () => {
+                  try {
+                    setCreatingKey(true)
+                    console.log("🔵 Settings: Creating API key:", apiKeyName)
+                    const response = await securityAPI.createAPIKey({ name: apiKeyName })
+                    setNewApiKey(response.key || response.apiKey || "تم بنجاح")
+                    showToast("تم إنشاء مفتاح API بنجاح", "success")
+                    setApiKeyName("")
+                    setShowApiKeyInput(false)
+                  } catch (err: any) {
+                    console.error("❌ Settings: Failed to create API key:", err)
+                    showToast(err.message || "فشل إنشاء مفتاح API", "error")
+                  } finally {
+                    setCreatingKey(false)
+                  }
+                }}
+                className="px-4 py-2 bg-[#7C3AED] text-white rounded-lg hover:bg-[#7C3AED]/90 font-medium text-sm disabled:opacity-50"
+              >
+                {creatingKey ? "جاري الإنشاء..." : "إنشاء"}
+              </button>
+              <button
+                onClick={() => { setShowApiKeyInput(false); setApiKeyName("") }}
+                className="px-3 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 text-sm"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowApiKeyInput(true)}
+            className="px-6 py-2 border border-[#7C3AED] text-[#7C3AED] rounded-lg hover:bg-[#7C3AED]/10 font-medium"
+          >
+            إنشاء مفتاح API جديد
+          </button>
+        )}
       </div>
     </div>
   )
@@ -2354,6 +2495,7 @@ function TransferOwnershipModal({ onClose }: { onClose: () => void }) {
   const [selectedMember, setSelectedMember] = useState("")
   const [confirmText, setConfirmText] = useState("")
   const [submitting, setSubmitting] = useState(false)
+  const [modalMsg, setModalMsg] = useState<{ text: string; type: "success" | "error" } | null>(null)
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
@@ -2395,6 +2537,12 @@ function TransferOwnershipModal({ onClose }: { onClose: () => void }) {
             />
           </div>
 
+          {modalMsg && (
+            <div className={`mb-4 px-4 py-3 rounded-lg text-sm font-medium ${
+              modalMsg.type === "success" ? "bg-[#10B981]/10 border border-[#10B981]/20 text-[#10B981]" : "bg-red-50 border border-red-200 text-red-600"
+            }`}>{modalMsg.text}</div>
+          )}
+
           <div className="flex items-center gap-3">
             <button
               onClick={onClose}
@@ -2409,11 +2557,11 @@ function TransferOwnershipModal({ onClose }: { onClose: () => void }) {
                   setSubmitting(true)
                   console.log("🔵 Settings: Transferring ownership to:", selectedMember)
                   await advancedAPI.transferOwnership({ newOwnerId: selectedMember, confirmation: confirmText })
-                  alert("تم نقل الملكية بنجاح")
-                  onClose()
+                  setModalMsg({ text: "تم نقل الملكية بنجاح", type: "success" })
+                  setTimeout(() => onClose(), 1500)
                 } catch (err: any) {
                   console.error("❌ Settings: Transfer failed:", err)
-                  alert(err.message || "فشل نقل الملكية")
+                  setModalMsg({ text: err.message || "فشل نقل الملكية", type: "error" })
                 } finally {
                   setSubmitting(false)
                 }
@@ -2433,6 +2581,7 @@ function TransferOwnershipModal({ onClose }: { onClose: () => void }) {
 function DeleteWorkspaceModal({ onClose }: { onClose: () => void }) {
   const [confirmText, setConfirmText] = useState("")
   const [submitting, setSubmitting] = useState(false)
+  const [modalMsg, setModalMsg] = useState<{ text: string; type: "success" | "error" } | null>(null)
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
@@ -2466,6 +2615,12 @@ function DeleteWorkspaceModal({ onClose }: { onClose: () => void }) {
             />
           </div>
 
+          {modalMsg && (
+            <div className={`mb-4 px-4 py-3 rounded-lg text-sm font-medium ${
+              modalMsg.type === "success" ? "bg-[#10B981]/10 border border-[#10B981]/20 text-[#10B981]" : "bg-red-50 border border-red-200 text-red-600"
+            }`}>{modalMsg.text}</div>
+          )}
+
           <div className="flex items-center gap-3">
             <button
               onClick={onClose}
@@ -2480,11 +2635,11 @@ function DeleteWorkspaceModal({ onClose }: { onClose: () => void }) {
                   setSubmitting(true)
                   console.log("🔵 Settings: Deleting workspace...")
                   await advancedAPI.deleteWorkspace({ confirmation: confirmText })
-                  alert("تم حذف المساحة")
-                  onClose()
+                  setModalMsg({ text: "تم حذف المساحة", type: "success" })
+                  setTimeout(() => onClose(), 1500)
                 } catch (err: any) {
                   console.error("❌ Settings: Delete failed:", err)
-                  alert(err.message || "فشل حذف المساحة")
+                  setModalMsg({ text: err.message || "فشل حذف المساحة", type: "error" })
                 } finally {
                   setSubmitting(false)
                 }
