@@ -1511,23 +1511,18 @@ function SecureField({ value, onChange, placeholder, readOnly = false }: { value
   const [visible, setVisible] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  const handleCopy = async () => {
+  const handleCopy = () => {
     if (!value) return
-    try {
-      await navigator.clipboard.writeText(value)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // fallback
-      const ta = document.createElement("textarea")
-      ta.value = value
-      document.body.appendChild(ta)
-      ta.select()
-      document.execCommand("copy")
-      document.body.removeChild(ta)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }
+    const ta = document.createElement("textarea")
+    ta.value = value
+    ta.style.position = "fixed"
+    ta.style.opacity = "0"
+    document.body.appendChild(ta)
+    ta.select()
+    document.execCommand("copy")
+    document.body.removeChild(ta)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   return (
@@ -1601,6 +1596,9 @@ function IntegrationsSection() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
+  const [confirmDisconnect, setConfirmDisconnect] = useState<string | null>(null)
+  const [disconnectError, setDisconnectError] = useState<string | null>(null)
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false)
 
   useEffect(() => {
     const fetchIntegrations = async () => {
@@ -1632,16 +1630,14 @@ function IntegrationsSection() {
     }
   })
 
-  const handleDisconnect = async (platform: any) => {
-    if (confirm(`هل تريد فصل ${platform.name}؟`)) {
-      try {
-        console.log("🔵 Settings: Disconnecting:", platform.id)
-        await integrationsAPI.disconnect(platform.id)
-        setApiIntegrations(prev => prev.filter((i: any) => i.id !== platform.id))
-      } catch (err: any) {
-        console.error("❌ Settings: Failed to disconnect:", err)
-        alert(err.message || "فشل فصل التكامل")
-      }
+  const handleDisconnect = async (platformId: string) => {
+    try {
+      await integrationsAPI.disconnect(platformId)
+      setApiIntegrations(prev => prev.filter((i: any) => i.id !== platformId))
+      setConfirmDisconnect(null)
+      setDisconnectError(null)
+    } catch (err: any) {
+      setDisconnectError(err?.response?.data?.message || err?.message || "فشل فصل التكامل")
     }
   }
 
@@ -1687,13 +1683,19 @@ function IntegrationsSection() {
 
   const handleCloseModal = () => {
     if (hasChanges) {
-      if (!confirm("لديك تغييرات غير محفوظة. هل تريد الإغلاق بدون حفظ؟")) return
+      setShowCloseConfirm(true)
+      return
     }
+    closeModal()
+  }
+
+  const closeModal = () => {
     setSettingsModal({ open: false, integration: null, settings: null, loading: false })
     setFormData({})
     setSaveSuccess(false)
-
+    setSaveError(null)
     setHasChanges(false)
+    setShowCloseConfirm(false)
   }
 
   const handleFieldChange = (key: string, value: string) => {
@@ -1784,19 +1786,43 @@ function IntegrationsSection() {
 
               {/* Action Buttons */}
               {platform.connected ? (
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleOpenSettings(platform)}
-                    className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-semibold transition-colors"
-                  >
-                    إعدادات
-                  </button>
-                  <button
-                    onClick={() => handleDisconnect(platform)}
-                    className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-semibold transition-colors"
-                  >
-                    إدارة
-                  </button>
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleOpenSettings(platform)}
+                      className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-semibold transition-colors"
+                    >
+                      إعدادات
+                    </button>
+                    <button
+                      onClick={() => { setConfirmDisconnect(platform.id); setDisconnectError(null) }}
+                      className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-semibold transition-colors"
+                    >
+                      إدارة
+                    </button>
+                  </div>
+                  {confirmDisconnect === platform.id && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-sm font-medium text-red-700 mb-2">هل تريد فصل الحساب؟</p>
+                      {disconnectError && (
+                        <p className="text-xs text-red-600 mb-2">{disconnectError}</p>
+                      )}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleDisconnect(platform.id)}
+                          className="flex-1 px-3 py-1.5 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700 transition-colors"
+                        >
+                          نعم، فصل
+                        </button>
+                        <button
+                          onClick={() => { setConfirmDisconnect(null); setDisconnectError(null) }}
+                          className="flex-1 px-3 py-1.5 border border-gray-300 text-gray-600 text-xs font-semibold rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                          إلغاء
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <button
@@ -1904,6 +1930,27 @@ function IntegrationsSection() {
                 </div>
               )}
             </div>
+
+            {/* Unsaved changes confirmation */}
+            {showCloseConfirm && (
+              <div className="px-6 py-3 bg-amber-50 border-t border-amber-200 flex items-center justify-between">
+                <span className="text-sm font-medium text-amber-700">لديك تغييرات غير محفوظة. هل تريد الإغلاق؟</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={closeModal}
+                    className="px-3 py-1.5 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700 transition-colors"
+                  >
+                    إغلاق بدون حفظ
+                  </button>
+                  <button
+                    onClick={() => setShowCloseConfirm(false)}
+                    className="px-3 py-1.5 border border-gray-300 text-gray-600 text-xs font-semibold rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    متابعة التعديل
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Modal Footer */}
             {!settingsModal.loading && (
