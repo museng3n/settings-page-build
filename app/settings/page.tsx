@@ -1598,6 +1598,8 @@ function IntegrationsSection() {
   }>({ open: false, integration: null, settings: null, loading: false })
   const [formData, setFormData] = useState<Record<string, string>>({})
   const [saveSuccess, setSaveSuccess] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
 
   useEffect(() => {
@@ -1714,13 +1716,23 @@ function IntegrationsSection() {
 
   }
 
-  const handleSaveSettings = () => {
+  const handleSaveSettings = async () => {
     if (!settingsModal.integration) return
-    console.log("🔵 Settings: Saving settings for:", settingsModal.integration.id, formData)
-    // TODO: ربط مع API الحقيقي لاحقاً - PUT /api/integrations/:platform/settings
-    setSaveSuccess(true)
-    setHasChanges(false)
-    setTimeout(() => setSaveSuccess(false), 3000)
+    setSaving(true)
+    setSaveSuccess(false)
+    setSaveError(null)
+    try {
+      await integrationsAPI.updateSettings(settingsModal.integration.id, formData)
+      setSaveSuccess(true)
+      setHasChanges(false)
+      setTimeout(() => setSaveSuccess(false), 3000)
+    } catch (err: any) {
+      const message = err?.response?.data?.message || err?.message || "حدث خطأ أثناء حفظ الإعدادات"
+      setSaveError(message)
+      setTimeout(() => setSaveError(null), 5000)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const currentFields = settingsModal.integration ? (PLATFORM_FIELDS[settingsModal.integration.id] || []) : []
@@ -1896,6 +1908,12 @@ function IntegrationsSection() {
                       <span className="text-sm font-medium text-[#10B981]">تم حفظ الإعدادات بنجاح</span>
                     </div>
                   )}
+                  {saveError && (
+                    <div className="flex items-center gap-2 px-3 py-2.5 bg-red-50 border border-red-200 rounded-lg">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                      <span className="text-sm font-medium text-red-600">{saveError}</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1911,14 +1929,20 @@ function IntegrationsSection() {
                   </button>
                   <button
                     onClick={handleSaveSettings}
-                    disabled={!hasChanges}
-                    className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all ${
-                      !hasChanges
+                    disabled={!hasChanges || saving}
+                    className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all flex items-center gap-2 ${
+                      !hasChanges || saving
                         ? "bg-gray-200 text-gray-400 cursor-not-allowed"
                         : "bg-[#7C3AED] text-white hover:bg-[#6D28D9] shadow-sm hover:shadow"
                     }`}
                   >
-                    حفظ الإعدادات
+                    {saving && (
+                      <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    )}
+                    {saving ? "جاري الحفظ..." : "حفظ الإعدادات"}
                   </button>
               </div>
             )}
