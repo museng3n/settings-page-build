@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(tail:*)",
+      "Bash(cd:*)",
+      "Bash(cd /c/Users/musta/Downloads/new_frontend/settings-page-build && npm run build 2>&1)",
+      "Bash(cd /c/Users/musta/Downloads/new_frontend/settings-page-build && git push 2>&1)",
+      "Bash(npx next:*)",
+      "Bash(git:*)"
+    ]
+  }
+}

@@ -1674,6 +1674,7 @@ function IntegrationsSection() {
     loading: boolean
   }>({ open: false, integration: null, settings: null, loading: false })
   const [formData, setFormData] = useState<Record<string, string>>({})
+  const [savedTokenKeys, setSavedTokenKeys] = useState<Set<string>>(new Set())
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -1736,11 +1737,21 @@ function IntegrationsSection() {
       setSettingsModal(prev => ({ ...prev, settings, loading: false }))
 
       // تعبئة البيانات من الـ API - رمز التحقق يأتي من الباك إند
+      // الباك إند يرسل التوكنات مخفية (مثل "•••7bFt") - لا نعرضها في الحقل
       const fields = PLATFORM_FIELDS[platform.id] || []
       const initial: Record<string, string> = {}
+      const tokenKeys = new Set<string>()
       fields.forEach((field) => {
-        initial[field.key] = settings[field.key] || ""
+        const val = settings[field.key] || ""
+        if (field.type === "password" && val && (val.includes("•") || val.length < 20)) {
+          // قيمة مخفية من الباك إند - نعرض الحقل فارغ مع إشارة أن التوكن محفوظ
+          initial[field.key] = ""
+          tokenKeys.add(field.key)
+        } else {
+          initial[field.key] = val
+        }
       })
+      setSavedTokenKeys(tokenKeys)
       setFormData(initial)
     } catch (err: any) {
       console.error("❌ Settings: Failed to fetch settings:", err)
@@ -1785,7 +1796,18 @@ function IntegrationsSection() {
     setSaveSuccess(false)
     setSaveError(null)
     try {
-      await integrationsAPI.updateSettings(settingsModal.integration.id, formData)
+      // لا نرسل التوكنات الفارغة - الباك إند يحتفظ بالقيمة الحالية
+      const fields = PLATFORM_FIELDS[settingsModal.integration.id] || []
+      const payload: Record<string, string> = {}
+      fields.forEach((field) => {
+        const val = formData[field.key] || ""
+        if (field.type === "password" && !val) {
+          // حقل توكن فارغ = لم يُغيّره المستخدم، لا نرسله
+          return
+        }
+        payload[field.key] = val
+      })
+      await integrationsAPI.updateSettings(settingsModal.integration.id, payload)
       setSaveSuccess(true)
       setHasChanges(false)
       setTimeout(() => setSaveSuccess(false), 3000)
@@ -1971,7 +1993,7 @@ function IntegrationsSection() {
                         <SecureField
                           value={formData[field.key] || ""}
                           onChange={(val) => handleFieldChange(field.key, val)}
-                          placeholder={field.placeholder}
+                          placeholder={savedTokenKeys.has(field.key) && !formData[field.key] ? "التوكن محفوظ - أدخل توكن جديد للتغيير" : field.placeholder}
                         />
                       ) : field.type === "readonly" ? (
                         <SecureField
