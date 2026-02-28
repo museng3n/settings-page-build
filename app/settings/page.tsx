@@ -1736,16 +1736,15 @@ function IntegrationsSection() {
       const settings = response.settings || response.data || response || {}
       setSettingsModal(prev => ({ ...prev, settings, loading: false }))
 
-      // تعبئة البيانات من الـ API - رمز التحقق يأتي من الباك إند
-      // الباك إند يرسل التوكنات مخفية (مثل "•••7bFt") - لا نعرضها في الحقل
+      // تعبئة البيانات من الـ API - الباك إند يرسل التوكن الكامل مفكوك التشفير
+      // الفرونتند يتحكم بالإظهار/الإخفاء عبر eye toggle في SecureField
       const fields = PLATFORM_FIELDS[platform.id] || []
       const initial: Record<string, string> = {}
       const tokenKeys = new Set<string>()
       fields.forEach((field) => {
         const val = settings[field.key] || ""
-        if (field.type === "password" && val && (val.includes("•") || val.length < 20)) {
-          // قيمة مخفية من الباك إند - نعرض الحقل فارغ مع إشارة أن التوكن محفوظ
-          initial[field.key] = ""
+        if (field.type === "password" && val) {
+          initial[field.key] = val
           tokenKeys.add(field.key)
         } else {
           initial[field.key] = val
