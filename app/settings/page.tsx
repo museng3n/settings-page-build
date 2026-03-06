@@ -42,7 +42,7 @@ export default function SettingsPage() {
     name: "Haider Don",
     email: "haider@triggerio.io",
     role: "owner",
-    avatar: "https://i.pravatar.cc/150?img=12",
+    avatar: "",
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -63,7 +63,7 @@ export default function SettingsPage() {
           name: userData.name || userData.fullName || `${userData.firstName || ""} ${userData.lastName || ""}`.trim() || "User",
           email: userData.email || "",
           role: userData.role || "owner",
-          avatar: userData.avatar || userData.profileImage || `https://i.pravatar.cc/150?img=12`,
+          avatar: userData.avatar || userData.profileImage || "",
         })
       }
     } catch (err: any) {
@@ -490,12 +490,37 @@ function AccountSection({ currentUser }: { currentUser: User }) {
       <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">صورة الملف الشخصي</h3>
         <div className="flex items-center gap-6">
-          <img
-            src={currentUser.avatar || "/placeholder.svg"}
-            alt="Profile"
-            className="w-20 h-20 rounded-full object-cover"
-            id="profileImage"
-          />
+          {/* Avatar with letter fallback */}
+          <div className="relative w-20 h-20" id="profileImageContainer">
+            {currentUser.avatar && currentUser.avatar !== "" && !currentUser.avatar.includes("pravatar") ? (
+              <img
+                src={currentUser.avatar.startsWith("/uploads") ? `${process.env.NEXT_PUBLIC_API_URL || "https://triggerio-backend.onrender.com"}${currentUser.avatar}` : currentUser.avatar}
+                alt="Profile"
+                className="w-20 h-20 rounded-full object-cover"
+                id="profileImage"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement
+                  target.style.display = "none"
+                  const fallback = target.nextElementSibling as HTMLElement
+                  if (fallback) fallback.style.display = "flex"
+                }}
+              />
+            ) : null}
+            <div
+              className="w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-bold select-none"
+              id="profileImageFallback"
+              style={{
+                backgroundColor: (() => {
+                  const colors = ["#7C3AED", "#2563EB", "#059669", "#D97706", "#DC2626", "#7C3AED", "#0891B2", "#4F46E5"]
+                  const charCode = currentUser.name ? currentUser.name.charCodeAt(0) : 0
+                  return colors[charCode % colors.length]
+                })(),
+                display: currentUser.avatar && currentUser.avatar !== "" && !currentUser.avatar.includes("pravatar") ? "none" : "flex",
+              }}
+            >
+              {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : "?"}
+            </div>
+          </div>
           <div>
             <input
               type="file"
@@ -516,22 +541,37 @@ function AccountSection({ currentUser }: { currentUser: User }) {
                   // Show preview immediately
                   const reader = new FileReader()
                   reader.onload = (event) => {
-                    const img = document.getElementById("profileImage") as HTMLImageElement
-                    if (img && event.target?.result) {
+                    const container = document.getElementById("profileImageContainer")
+                    if (container && event.target?.result) {
+                      let img = document.getElementById("profileImage") as HTMLImageElement
+                      if (!img) {
+                        img = document.createElement("img")
+                        img.id = "profileImage"
+                        img.className = "w-20 h-20 rounded-full object-cover"
+                        img.alt = "Profile"
+                        container.insertBefore(img, container.firstChild)
+                      }
                       img.src = event.target.result as string
+                      img.style.display = "block"
+                      const fallback = document.getElementById("profileImageFallback")
+                      if (fallback) fallback.style.display = "none"
                     }
                   }
                   reader.readAsDataURL(file)
 
                   // Upload to API
                   try {
-                    console.log("🔵 Settings: Uploading avatar...")
+                    console.log("Settings: Uploading avatar...")
                     const formData = new FormData()
                     formData.append("avatar", file)
-                    await settingsAPI.updateAvatar(formData)
-                    console.log("🟢 Settings: Avatar uploaded successfully")
+                    const response = await settingsAPI.updateAvatar(formData)
+                    console.log("Settings: Avatar uploaded successfully")
+                    if (response?.data?.avatar) {
+                      setCurrentUser((prev: User) => ({ ...prev, avatar: response.data.avatar }))
+                    }
                   } catch (err: any) {
-                    console.error("❌ Settings: Failed to upload avatar:", err)
+                    console.error("Settings: Failed to upload avatar:", err)
+                    showToast("فشل في رفع الصورة", "error")
                   }
                 }
               }}
